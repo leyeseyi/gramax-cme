@@ -1,16 +1,18 @@
-from hashlib import new
 import json
-from unicodedata import category
 from flask import Flask, jsonify, request, abort
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
+from psycopg2 import DatabaseError
 from models import setup_db, Question, Category
-
+import cloudinary, cloudinary.uploader
+from dotenv import load_dotenv
+import os
 app = Flask(__name__)
 
 setup_db(app)
 
 CORS(app, resources={'/': {'origins': '*'}})
 
+load_dotenv()
 
 @app.after_request
 def after_request(response):
@@ -68,26 +70,54 @@ def get_questions():
 
 
 @app.route('/questions', methods=['POST'])
+@cross_origin()
 def create_question():
-    body = request.get_json()
-    question = body.get('question', None)
-    a = body.get('a', None)
-    b = body.get('b', None)
-    c = body.get('c', None)
-    d = body.get('d', None)
-    category = body.get('category', None)
-    answer = body.get('answer', None)
-    image_link = body.get('image_link', None)
+    # body = request.get_json()
+    # question = body.get('question', None)
+    # a = body.get('a', None)
+    # b = body.get('b', None)
+    # c = body.get('c', None)
+    # d = body.get('d', None)
+    # category = body.get('category', None)
+    # answer = body.get('answer', None)
+    # image_link = body.get('image_link', None)
+    
+    # MOCK Data
+    question = 'Who is seyi?'
+    a = 'a'
+    b = 'b'
+    c = 'c'
+    d = 'd'
+    category = 'Person'
+    answer = 'answer'
 
+    app.logger.info('in upload route')
+
+
+    cloudinary.config(
+        cloud_name = os.getenv('cloud_name'), 
+        api_key=os.getenv('api_key'), 
+        api_secret=os.getenv('api_secret')
+    )
+
+    upload_result = None
+    if request.method == 'POST':
+        file_to_upload = request.files['file']
+        app.logger.info('%s file_to_upload', file_to_upload)
+        if file_to_upload:
+            upload_result = cloudinary.uploader.upload(file_to_upload)
+            app.logger.info(upload_result)
+        # return jsonify(upload_result)
+    print("url is:", upload_result.get("url"))
+    
     # VERIFY BEFORE ADDING QUESTION TO DB
     if (question == '') or (answer == '') or (category == '') or (a == '') or (b == '') or (c == '') or (d == ''):
         abort(422)
 
-    # ADD QUESTION
     try:
         question = Question(question=question, answer=answer,
                             category=category, a=a, b=b, c=c, d=d,
-                            image_link=image_link)
+                            image_link=upload_result.get("url"))
         question.insert()
 
         return jsonify({
